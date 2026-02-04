@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source:*)",
+      "Bash(python3 -c \"\nimport requests\n\nURL = ''https://aims-worldrunning.org/calendar.html''\nHEADERS = {''User-Agent'': ''MarathonCrawler/1.0 \\(contact@example.com\\)''}\nres = requests.get\\(URL, headers=HEADERS, timeout=15\\)\ntext = res.text\n\n# div class 패턴 확인\nimport re\nclasses = re.findall\\(r''class=[\"\"\\\\'']\\([^\"\"\\\\'']*\\)[\"\"\\\\''\\\\'']'', text\\)\n# 고유한 class들\nunique = sorted\\(set\\(classes\\)\\)\nfor c in unique:\n    if ''event'' in c.lower\\(\\) or ''race'' in c.lower\\(\\) or ''calendar'' in c.lower\\(\\) or ''row'' in c.lower\\(\\) or ''month'' in c.lower\\(\\):\n        print\\(c\\)\n\")",
+      "Bash(python:*)",
+      "Bash(python3 -c:*)"
+    ]
+  }
+}
