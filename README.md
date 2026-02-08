@@ -1,18 +1,31 @@
-# AIMS Marathon Calendar Crawler
+# Marathon Crawler
 
-[AIMS World Running](https://aims-worldrunning.org/calendar.html) 캘린더 페이지에서 국제 마라톤 대회 일정을 크롤링하여 JSON 파일로 저장하는 Python 스크립트입니다.
+해외/국내 마라톤 대회 정보를 크롤링하여 JSON으로 저장하는 스크립트 모음입니다.
 
-## 수집 항목
+## 구조
 
-| 필드 | 설명 |
-|------|------|
-| `event_name` | 대회명 |
-| `start_date` | 시작일 (YYYY-MM-DD) |
-| `end_date` | 종료일 (YYYY-MM-DD) |
-| `country_code` | 국가 코드 |
-| `city` | 도시 (현재 미지원) |
-| `distances` | 거리 종류 (FULL, HALF, 10K, ULTRA) |
-| `aims_url` | AIMS 상세 페이지 URL |
+| 파일 | 설명 | 출력 |
+|------|------|------|
+| `crawl_global.py` | World's Marathons API 해외 대회 수집 | `marathons_global_raw.json`, `marathons_global_parsed.json` |
+| `crawl_korea.py` | 마라톤온라인(roadrun.co.kr) 국내 대회 크롤링 | `marathons_korea.json` |
+
+## crawl_global.py (해외)
+
+- World's Marathons API에서 전 세계 마라톤 데이터 수집 (약 5,000개)
+- API 1,000개 제한을 대륙/국가/종목별 분할 쿼리로 우회
+- 국가명, 노면, 난이도, 태그 등 한글 변환
+- EUR → KRW 환율 적용 (1,450원, 백원 단위 반올림)
+- 오늘 이전 대회 자동 필터링
+- 대륙 정보 자동 매핑
+
+## crawl_korea.py (국내)
+
+- 마라톤온라인 목록 + 상세페이지 파싱
+- 대회 홈페이지에서 대표 이미지 자동 추출
+- 참가비 자동 추출 (상세페이지 기타소개에서)
+- 접수기간 시작/종료일 분리 (registrationStartDate, registrationEndDate)
+- 종목 필터링 (풀, 하프, 10km, 5km만 유지)
+- 오늘 이전 대회 자동 필터링
 
 ## 요구사항
 
@@ -31,27 +44,9 @@ pip install requests beautifulsoup4
 ## 실행
 
 ```bash
-python main.py
-```
+# 해외 대회
+python crawl_global.py
 
-실행 후 `aims_marathons.json` 파일이 생성됩니다.
-
-## 출력 예시
-
-```json
-{
-  "source": "aims-worldrunning.org",
-  "updated_at": "2026-02-04T05:29:00.000000Z",
-  "events": [
-    {
-      "event_name": "Example Marathon",
-      "start_date": "2026-03-15",
-      "end_date": "2026-03-15",
-      "country_code": "KOR",
-      "city": null,
-      "distances": ["FULL", "HALF"],
-      "aims_url": "https://aims-worldrunning.org/..."
-    }
-  ]
-}
+# 국내 대회
+python crawl_korea.py
 ```
