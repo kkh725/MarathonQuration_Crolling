@@ -778,10 +778,12 @@ def fetch_marathon_data():
 
         # 원본 데이터 저장
         print("\n💾 원본 데이터 저장 중...")
+        import os
+        os.makedirs('data', exist_ok=True)
         raw_output = {'count': len(all_results), 'results': all_results}
-        with open("marathons_global_raw.json", "w", encoding="utf-8") as f:
+        with open("data/marathons_global_raw.json", "w", encoding="utf-8") as f:
             json.dump(raw_output, f, ensure_ascii=False, indent=2)
-        print(f"✅ marathons_global_raw.json 저장 완료 ({len(all_results)}개)")
+        print(f"✅ data/marathons_global_raw.json 저장 완료 ({len(all_results)}개)")
 
         # 파싱
         print("\n🔄 데이터 파싱 중...")
@@ -811,9 +813,9 @@ def fetch_marathon_data():
             },
             'marathons': parsed_marathons
         }
-        with open("marathons_global.json", "w", encoding="utf-8") as f:
+        with open("data/marathons_global.json", "w", encoding="utf-8") as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
-        print(f"✅ marathons_global.json 저장 완료")
+        print(f"✅ data/marathons_global.json 저장 완료")
 
         # 통계 출력
         print_statistics(parsed_marathons)
@@ -924,14 +926,51 @@ def print_samples(marathons: List[Dict]):
 
 if __name__ == "__main__":
     marathons = fetch_marathon_data()
-    
+
     if marathons:
         print("\n" + "=" * 70)
-        print("✅ 모든 작업 완료!")
+        print("✅ 크롤링 완료!")
         print("=" * 70)
         print(f"\n저장된 파일:")
-        print(f"  1. marathons_global_raw.json - 원본 API 응답")
-        print(f"  2. marathons_global.json - 파싱된 데이터")
+        print(f"  1. data/marathons_global_raw.json - 원본 API 응답")
+        print(f"  2. data/marathons_global.json - 파싱된 데이터")
         print(f"\n총 {len(marathons)}개의 마라톤 데이터 수집 완료! 🎉")
+
+        # visa 데이터 자동 병합
+        print("\n" + "=" * 70)
+        print("🌍 비자 데이터 병합 시작")
+        print("=" * 70)
+        try:
+            import subprocess
+
+            # visa 데이터 병합 실행
+            print("\n비자 정보 추가 중...")
+            result = subprocess.run(
+                ['python3', 'merge_visa_data.py', 'marathons_global_raw.json'],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                print(result.stdout)
+            else:
+                print(f"⚠️  비자 데이터 병합 중 오류 발생:\n{result.stderr}")
+
+            result = subprocess.run(
+                ['python3', 'merge_visa_data.py', 'marathons_global.json'],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                print(result.stdout)
+            else:
+                print(f"⚠️  비자 데이터 병합 중 오류 발생:\n{result.stderr}")
+
+            print("\n" + "=" * 70)
+            print("✅ 모든 작업 완료!")
+            print("=" * 70)
+
+        except Exception as e:
+            print(f"\n⚠️  비자 데이터 병합 중 오류 발생: {e}")
+            print("수동으로 merge_visa_data.py를 실행해주세요.")
     else:
         print("\n❌ 데이터 수집 실패")
