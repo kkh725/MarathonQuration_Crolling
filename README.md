@@ -8,6 +8,7 @@
 |------|------|------|
 | `crawl_global.py` | World's Marathons API 해외 대회 수집 | `marathons_global_raw.json`, `marathons_global_parsed.json` |
 | `crawl_korea.py` | 마라톤온라인(roadrun.co.kr) 국내 대회 크롤링 | `marathons_korea.json` |
+| `merge_visa_data.py` | 마라톤 데이터에 비자 정보 자동 병합 | `marathons_global.json` (업데이트) |
 
 ## crawl_global.py (해외)
 
@@ -27,6 +28,15 @@
 - 종목 필터링 (풀, 하프, 10km, 5km만 유지)
 - 오늘 이전 대회 자동 필터링
 
+## merge_visa_data.py (비자 정보 병합)
+
+- 마라톤 데이터에 국가별 비자 정보 자동 추가
+- `visa.json` (한국관광공사 API)에서 국가 코드 기반 매칭
+- 비자 없이 체류 가능한 일수 자동 파싱
+  - "90일", "6개월", "180일 중 90일" 등 다양한 형식 처리
+  - 비자 필요 시 `null` 반환
+- `marathons_global.json` 파일 자동 업데이트
+
 ## 요구사항
 
 - Python 3.9+
@@ -44,9 +54,12 @@ pip install requests beautifulsoup4
 ## 실행
 
 ```bash
-# 해외 대회
+# 해외 대회 크롤링
 python crawl_global.py
 
-# 국내 대회
+# 국내 대회 크롤링
 python crawl_korea.py
+
+# 비자 정보 병합 (해외 대회 데이터에 적용)
+python merge_visa_data.py marathons_global.json
 ```
