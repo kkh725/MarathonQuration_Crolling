@@ -9,12 +9,15 @@ import json
 import time
 from datetime import datetime
 from typing import List, Dict, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 class MarathonParser:
     """마라톤 데이터 파싱 클래스"""
 
     # 번역 캐시 (같은 도시명을 여러 번 번역하지 않도록)
     _translation_cache = {}
+    _cache_lock = threading.Lock()  # 스레드 안전성을 위한 락
 
     # 대회 타입 한글 변환
     RACE_TYPE_KR = {
@@ -388,6 +391,116 @@ class MarathonParser:
         # 멕시코 주요 도시
         'Mexico City': '멕시코시티', 'Guadalajara': '과달라하라', 'Monterrey': '몬테레이',
         'Cancún': '칸쿤', 'Tijuana': '티후아나', 'Puebla': '푸에블라',
+
+        # 미국 추가 도시 (마라톤 개최지)
+        'Anchorage': '앵커리지', 'Boise': '보이시', 'Des Moines': '디모인',
+        'Madison': '매디슨', 'Charleston': '찰스턴', 'Savannah': '사바나',
+        'Eugene': '유진', 'Bend': '벤드', 'Spokane': '스포캔',
+        'Ann Arbor': '앤아버', 'Boulder': '볼더', 'Santa Barbara': '산타바바라',
+        'Napa': '나파', 'Aspen': '아스펜', 'Park City': '파크시티',
+        'Key West': '키웨스트', 'Myrtle Beach': '머틀비치', 'Virginia Beach': '버지니아비치',
+        'Fort Lauderdale': '포트로더데일', 'San Luis Obispo': '산루이스오비스포',
+        'Carmel': '카멜', 'Monterey': '몬터레이', 'Big Sur': '빅서',
+        'Duluth': '덜루스', 'Fargo': '파고', 'Sioux Falls': '수폴스',
+        'Green Bay': '그린베이', 'Traverse City': '트래버스시티',
+
+        # 캐나다 추가 도시
+        'Saskatoon': '서스커툰', 'Regina': '리자이나', 'Kelowna': '켈로나',
+        'London': '런던', 'Kitchener': '키치너', 'St. John\'s': '세인트존스',
+        'Fredericton': '프레더릭턴', 'Charlottetown': '샬럿타운',
+
+        # 영국 추가 도시
+        'Swansea': '스완지', 'Lincoln': '링컨', 'Blackpool': '블랙풀',
+        'Stratford-upon-Avon': '스트랫퍼드어폰에이번', 'Inverness': '인버네스',
+        'Aberdeen': '애버딘', 'Stirling': '스털링', 'Perth': '퍼스',
+        'St Albans': '세인트올번스', 'Salisbury': '솔즈베리',
+
+        # 독일 추가 도시
+        'Freiburg': '프라이부르크', 'Heidelberg': '하이델베르크', 'Regensburg': '레겐스부르크',
+        'Würzburg': '뷔르츠부르크', 'Trier': '트리어', 'Ulm': '울름',
+        'Rostock': '로스토크', 'Kiel': '킬', 'Lübeck': '뤼베크',
+        'Potsdam': '포츠담', 'Bamberg': '밤베르크',
+
+        # 프랑스 추가 도시
+        'Versailles': '베르사유', 'Avignon': '아비뇽', 'La Rochelle': '라로셸',
+        'Annecy': '안시', 'Chamonix': '샤모니', 'Colmar': '콜마르',
+        'Metz': '메스', 'Nancy': '낭시', 'Perpignan': '페르피냥',
+        'Limoges': '리모주', 'Clermont-Ferrand': '클레르몽페랑',
+
+        # 이탈리아 추가 도시
+        'Siena': '시에나', 'Perugia': '페루자', 'Lucca': '루카',
+        'Ferrara': '페라라', 'Vicenza': '비첸차', 'Ancona': '안코나',
+        'Como': '코모', 'Bergamo': '베르가모', 'Bolzano': '볼차노',
+
+        # 스페인 추가 도시
+        'Pamplona': '팜플로나', 'Salamanca': '살라망카', 'Santander': '산탄데르',
+        'Oviedo': '오비에도', 'Tarragona': '타라고나', 'Cádiz': '카디스',
+        'Toledo': '톨레도', 'Segovia': '세고비아', 'Ronda': '론다',
+
+        # 네덜란드/벨기에 추가
+        'Haarlem': '하를럼', 'Delft': '델프트', 'Leiden': '레이던',
+        'Den Bosch': '덴보스', 'Arnhem': '아른험', 'Waterloo': '워털루',
+
+        # 스위스/오스트리아 추가
+        'Lugano': '루가노', 'Montreux': '몽트뢰', 'Zermatt': '체르마트',
+        'Grindelwald': '그린델발트', 'Graz': '그라츠',
+
+        # 북유럽 추가
+        'Aarhus': '오르후스', 'Odense': '오덴세', 'Trondheim': '트론헤임',
+        'Stavanger': '스타방에르', 'Tromsø': '트롬쇠', 'Uppsala': '웁살라',
+        'Lund': '룬드', 'Oulu': '오울루', 'Rovaniemi': '로바니에미',
+
+        # 동유럽 추가
+        'Gdańsk': '그단스크', 'Wrocław': '브로츠와프', 'Poznań': '포즈난',
+        'Brno': '브르노', 'Český Krumlov': '체스키크룸로프',
+        'Debrecen': '데브레첸', 'Szeged': '세게드',
+
+        # 일본 추가 도시
+        'Kanazawa': '가나자와', 'Takayama': '다카야마', 'Nikko': '닛코',
+        'Hakone': '하코네', 'Kamakura': '가마쿠라', 'Matsumoto': '마쓰모토',
+        'Nagano': '나가노', 'Gifu': '기후', 'Shizuoka': '시즈오카',
+        'Okayama': '오카야마', 'Kumamoto': '구마모토', 'Kagoshima': '가고시마',
+        'Miyazaki': '미야자키', 'Niigata': '니가타', 'Toyama': '도야마',
+
+        # 한국 추가 도시
+        'Ulsan': '울산', 'Suwon': '수원', 'Jeonju': '전주',
+        'Jeju': '제주', 'Sokcho': '속초', 'Gyeongju': '경주',
+        'Chuncheon': '춘천', 'Gangneung': '강릉',
+
+        # 중국 추가 도시
+        'Hangzhou': '항저우', 'Suzhou': '쑤저우', 'Nanjing': '난징',
+        'Wuhan': '우한', 'Xi\'an': '시안', 'Chongqing': '충칭',
+        'Dalian': '다롄', 'Qingdao': '칭다오', 'Guilin': '구이린',
+
+        # 동남아시아 추가
+        'Phuket': '푸켓', 'Chiang Mai': '치앙마이', 'Pattaya': '파타야',
+        'Angkor': '앙코르', 'Siem Reap': '씨엠립', 'Vientiane': '비엔티안',
+        'Luang Prabang': '루앙프라방', 'Bali': '발리', 'Yogyakarta': '욕야카르타',
+        'Penang': '페낭', 'Langkawi': '랑카위', 'Cebu': '세부',
+        'Boracay': '보라카이',
+
+        # 인도 추가
+        'Goa': '고아', 'Jaipur': '자이푸르', 'Agra': '아그라',
+        'Varanasi': '바라나시', 'Pune': '푸네', 'Kochi': '코치',
+
+        # 중동 추가
+        'Muscat': '무스카트', 'Manama': '마나마', 'Kuwait City': '쿠웨이트시티',
+
+        # 호주/뉴질랜드 추가
+        'Hobart': '호바트', 'Darwin': '다윈', 'Cairns': '케언스',
+        'Wollongong': '울런공', 'Geelong': '질롱', 'Newcastle': '뉴캐슬',
+        'Dunedin': '더니든', 'Rotorua': '로토루아', 'Taupo': '타우포',
+
+        # 남미 추가
+        'Medellín': '메데인', 'Cartagena': '카르타헤나', 'Cusco': '쿠스코',
+        'Valparaíso': '발파라이소', 'Viña del Mar': '비냐델마르',
+        'Punta del Este': '푼타델에스테', 'Bariloche': '바릴로체',
+        'Mendoza': '멘도사', 'Córdoba': '코르도바',
+
+        # 아프리카 추가
+        'Durban': '더반', 'Port Elizabeth': '포트엘리자베스',
+        'Stellenbosch': '스텔렌보스', 'Luxor': '룩소르',
+        'Marrakesh': '마라케시', 'Rabat': '라바트',
     }
 
     # 국가 → 대륙(한글) 매핑
@@ -506,9 +619,9 @@ class MarathonParser:
             return text
 
     @staticmethod
-    def get_city_kr(city: str) -> str:
+    def get_city_kr(city: str, verbose: bool = False) -> str:
         """
-        도시명을 한글로 변환
+        도시명을 한글로 변환 (Thread-safe)
         1. CITY_KR 딕셔너리에서 매핑 확인
         2. 매핑 없으면 MyMemory Translation API로 번역
         3. API 실패시 원본 유지
@@ -520,20 +633,91 @@ class MarathonParser:
         if city in MarathonParser.CITY_KR:
             return MarathonParser.CITY_KR[city]
 
-        # 2. 캐시에서 확인
-        if city in MarathonParser._translation_cache:
-            return MarathonParser._translation_cache[city]
+        # 2. 캐시에서 확인 (thread-safe)
+        with MarathonParser._cache_lock:
+            if city in MarathonParser._translation_cache:
+                return MarathonParser._translation_cache[city]
 
         # 3. MyMemory Translation API로 번역
+        if verbose:
+            print(f"      🌐 API 번역 중: '{city}'", end=' ', flush=True)
+
         translated = MarathonParser.translate_with_api(city)
 
-        # 캐시에 저장
-        MarathonParser._translation_cache[city] = translated
+        if verbose:
+            print(f"→ '{translated}'")
 
-        # API 호출 간격 (너무 빠르게 호출하면 차단될 수 있음)
-        time.sleep(0.1)
+        # 캐시에 저장 (thread-safe)
+        with MarathonParser._cache_lock:
+            MarathonParser._translation_cache[city] = translated
+
+        # API 호출 간격 단축 (0.05초 → 0.015초)
+        time.sleep(0.015)
 
         return translated
+
+    @staticmethod
+    def translate_cities_batch(cities: List[str], max_workers: int = 15) -> Dict[str, str]:
+        """
+        여러 도시명을 병렬로 번역
+
+        Args:
+            cities: 번역할 도시명 리스트
+            max_workers: 동시 처리 스레드 수
+
+        Returns:
+            {원본: 번역} 딕셔너리
+        """
+        results = {}
+
+        # 이미 번역된 도시명 제외
+        cities_to_translate = []
+        for city in cities:
+            if not city or not city.strip():
+                continue
+            if city in MarathonParser.CITY_KR:
+                results[city] = MarathonParser.CITY_KR[city]
+            elif city in MarathonParser._translation_cache:
+                results[city] = MarathonParser._translation_cache[city]
+            else:
+                cities_to_translate.append(city)
+
+        if not cities_to_translate:
+            return results
+
+        print(f"   🚀 병렬 번역 시작: {len(cities_to_translate)}개 (동시 {max_workers}개)")
+
+        def translate_single(city: str) -> tuple:
+            """단일 도시명 번역"""
+            translated = MarathonParser.translate_with_api(city)
+            time.sleep(0.015)  # API rate limit 방지
+            return (city, translated)
+
+        # ThreadPoolExecutor로 병렬 번역
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(translate_single, city): city for city in cities_to_translate}
+
+            completed = 0
+            for future in as_completed(futures):
+                try:
+                    city, translated = future.result()
+                    results[city] = translated
+
+                    # 캐시에 저장
+                    with MarathonParser._cache_lock:
+                        MarathonParser._translation_cache[city] = translated
+
+                    completed += 1
+                    if completed % 50 == 0:
+                        print(f"   [{completed}/{len(cities_to_translate)}] 번역 진행 중...")
+
+                except Exception as e:
+                    city = futures[future]
+                    print(f"   ⚠️  번역 실패: {city} - {e}")
+                    results[city] = city
+
+        print(f"   ✅ 병렬 번역 완료: {len(cities_to_translate)}개")
+        return results
 
     # 태그 한글 변환 (자연스러운 것만)
     TAG_KR = {
@@ -836,11 +1020,11 @@ class MarathonParser:
             'firstRaceDate': first_race_date,
             'lastRaceDate': last_race_date,
             
-            # 위치 정보
-            'city': MarathonParser.get_city_kr(city),
-            'country': MarathonParser.get_country_kr(country),
+            # 위치 정보 (중복 호출 방지를 위해 변수에 저장)
+            'city': (city_kr := MarathonParser.get_city_kr(city)),
+            'country': (country_kr := MarathonParser.get_country_kr(country)),
             'countryCode': country_code,
-            'location': f"{MarathonParser.get_city_kr(city)}, {MarathonParser.get_country_kr(country)}" if city and country else MarathonParser.get_city_kr(city) or MarathonParser.get_country_kr(country),
+            'location': f"{city_kr}, {country_kr}" if city and country else city_kr or country_kr,
             'continent': MarathonParser.get_continent_kr(country),
             'startPoint': start_point,
             'coordinates': {
@@ -863,7 +1047,9 @@ class MarathonParser:
             'thumbnail': image_small or image_extra_small or image,
             
             # 가격
-            'minPrice': round(int(min_price * 1450), -2) if min_price else 0,
+            'minPriceEUR': min_price,  # 원본 EUR 가격
+            'minPriceKRW': round(int(min_price * 1450), -2) if min_price else 0,  # 원화 변환
+            'minPrice': round(int(min_price * 1450), -2) if min_price else 0,  # 하위 호환성
             'minPriceFormatted': f"약 {round(int(min_price * 1450), -2):,}원" if min_price else '',
             'earlyBirdDaysLeft': early_bird_days_left,
             'hasEarlyBird': early_bird_days_left is not None and early_bird_days_left > 0,
@@ -1010,21 +1196,66 @@ def fetch_marathon_data():
             json.dump(raw_output, f, ensure_ascii=False, indent=2)
         print(f"✅ data/marathons_global_raw.json 저장 완료 ({len(all_results)}개)")
 
-        # 파싱
+        # 파싱 전 단계: 모든 도시명 수집 및 사전 번역 (병렬)
         print("\n🔄 데이터 파싱 중...")
+        print(f"   총 {len(all_results)}개 처리 예정")
+
+        start_time = time.time()
+        cache_initial_size = len(MarathonParser._translation_cache)
+
+        # Step 1: 모든 도시명 수집
+        print("\n📍 Step 1: 도시명 수집 중...")
+        all_cities = set()
+        for raw in all_results:
+            city = raw.get('city', '')
+            if city and city.strip():
+                all_cities.add(city)
+
+        print(f"   총 {len(all_cities)}개 고유 도시명 발견")
+
+        # Step 2: 병렬 번역 (캐시에 없는 것만)
+        print("\n🌐 Step 2: 병렬 번역 시작...")
+        MarathonParser.translate_cities_batch(list(all_cities), max_workers=15)
+
+        translation_time = time.time() - start_time
+        new_translations = len(MarathonParser._translation_cache) - cache_initial_size
+        print(f"   ⚡ 번역 완료: {new_translations}개 (소요 시간: {translation_time:.1f}초)")
+
+        # Step 3: 파싱 (이제 번역이 캐시에 있으므로 빠름)
+        print("\n📝 Step 3: 마라톤 데이터 파싱...")
         parsed_marathons = []
+        parse_start = time.time()
+
         for i, raw_marathon in enumerate(all_results, 1):
             try:
                 parsed = MarathonParser.parse_marathon(raw_marathon)
                 if parsed is None:
                     continue
                 parsed_marathons.append(parsed)
+
+                # 진행 상황 출력 (500개마다)
                 if i % 500 == 0:
-                    print(f"   처리 중... {i}/{len(all_results)}")
+                    elapsed = time.time() - parse_start
+                    progress = (i / len(all_results)) * 100
+                    avg_time = elapsed / i
+                    eta = (len(all_results) - i) * avg_time
+                    print(f"   [{progress:5.1f}%] {i:4d}/{len(all_results)} 처리 완료 | "
+                          f"예상 남은 시간: {eta:5.1f}초")
             except Exception as e:
                 print(f"   ⚠️  {i}번째 마라톤 파싱 실패: {e}")
                 continue
-        print(f"✅ 파싱 완료: {len(parsed_marathons)}개")
+
+        parse_time = time.time() - parse_start
+        total_time = time.time() - start_time
+
+        print(f"\n✅ 파싱 완료: {len(parsed_marathons)}개")
+        print(f"   🌐 신규 번역: {new_translations}개 (병렬 처리: {translation_time:.1f}초)")
+        print(f"   📝 데이터 파싱: {parse_time:.1f}초")
+        print(f"   ⏱️  총 소요 시간: {total_time:.1f}초")
+        print(f"   📦 번역 캐시 크기: {len(MarathonParser._translation_cache)}개")
+        if new_translations > 0:
+            speed_improvement = (new_translations * 0.05) / translation_time
+            print(f"   ⚡ 속도 개선: 기존 대비 약 {speed_improvement:.1f}배 빠름!")
 
         # 파싱된 데이터 저장
         print("\n💾 파싱된 데이터 저장 중...")
