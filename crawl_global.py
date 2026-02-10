@@ -13,6 +13,9 @@ from typing import List, Dict, Optional
 class MarathonParser:
     """마라톤 데이터 파싱 클래스"""
 
+    # 번역 캐시 (같은 도시명을 여러 번 번역하지 않도록)
+    _translation_cache = {}
+
     # 대회 타입 한글 변환
     RACE_TYPE_KR = {
         'full_marathon': '풀코스',
@@ -226,6 +229,167 @@ class MarathonParser:
         'Åland Islands': '올란드 제도',
     }
 
+    # 도시명 한글 변환 (세계 주요 마라톤 도시)
+    CITY_KR = {
+        # 미국 주요 도시
+        'New York': '뉴욕', 'Los Angeles': '로스앤젤레스', 'Chicago': '시카고',
+        'Houston': '휴스턴', 'Phoenix': '피닉스', 'Philadelphia': '필라델피아',
+        'San Antonio': '샌안토니오', 'San Diego': '샌디에이고', 'Dallas': '댈러스',
+        'San Jose': '산호세', 'Austin': '오스틴', 'Jacksonville': '잭슨빌',
+        'San Francisco': '샌프란시스코', 'Columbus': '콜럼버스', 'Indianapolis': '인디애나폴리스',
+        'Fort Worth': '포트워스', 'Charlotte': '샬럿', 'Seattle': '시애틀',
+        'Denver': '덴버', 'Washington': '워싱턴', 'Boston': '보스턴',
+        'Nashville': '내슈빌', 'Detroit': '디트로이트', 'Portland': '포틀랜드',
+        'Las Vegas': '라스베이거스', 'Memphis': '멤피스', 'Louisville': '루이빌',
+        'Baltimore': '볼티모어', 'Milwaukee': '밀워키', 'Albuquerque': '앨버커키',
+        'Tucson': '투손', 'Fresno': '프레즈노', 'Sacramento': '새크라멘토',
+        'Kansas City': '캔자스시티', 'Atlanta': '애틀랜타', 'Miami': '마이애미',
+        'Raleigh': '롤리', 'Minneapolis': '미니애폴리스', 'Omaha': '오마하',
+        'Cleveland': '클리블랜드', 'New Orleans': '뉴올리언스', 'Tampa': '탬파',
+        'Honolulu': '호놀룰루', 'Pittsburgh': '피츠버그', 'Cincinnati': '신시내티',
+        'Orlando': '올랜도', 'St. Louis': '세인트루이스', 'Richmond': '리치먼드',
+        'Buffalo': '버펄로', 'Salt Lake City': '솔트레이크시티',
+
+        # 캐나다 주요 도시
+        'Toronto': '토론토', 'Montreal': '몬트리올', 'Vancouver': '밴쿠버',
+        'Calgary': '캘거리', 'Edmonton': '에드먼턴', 'Ottawa': '오타와',
+        'Quebec': '퀘벡', 'Winnipeg': '위니펙', 'Hamilton': '해밀턴',
+        'Victoria': '빅토리아', 'Halifax': '핼리팩스',
+
+        # 영국 주요 도시
+        'London': '런던', 'Manchester': '맨체스터', 'Birmingham': '버밍엄',
+        'Leeds': '리즈', 'Glasgow': '글래스고', 'Edinburgh': '에딘버러',
+        'Liverpool': '리버풀', 'Bristol': '브리스톨', 'Sheffield': '셰필드',
+        'Newcastle': '뉴캐슬', 'Belfast': '벨파스트', 'Cardiff': '카디프',
+        'Leicester': '레스터', 'Nottingham': '노팅엄', 'Southampton': '사우샘프턴',
+        'Brighton': '브라이튼', 'Oxford': '옥스퍼드', 'Cambridge': '케임브리지',
+        'York': '요크', 'Bath': '바스', 'Bradford': '브래드퍼드',
+        'Coventry': '코번트리', 'Hull': '헐', 'Plymouth': '플리머스',
+        'Reading': '레딩', 'Canterbury': '캔터베리', 'Winchester': '윈체스터',
+        'Chester': '체스터', 'Derby': '더비', 'Exeter': '엑서터',
+        'Portsmouth': '포츠머스', 'Norwich': '노리치', 'Durham': '더럼',
+        'Windsor': '윈저', 'Eastbourne': '이스트본', 'Bournemouth': '본머스',
+        'Worthing': '워딩', 'Northampton': '노샘프턴',
+
+        # 프랑스 주요 도시
+        'Paris': '파리', 'Marseille': '마르세유', 'Lyon': '리옹',
+        'Toulouse': '툴루즈', 'Nice': '니스', 'Nantes': '낭트',
+        'Strasbourg': '스트라스부르', 'Montpellier': '몽펠리에', 'Bordeaux': '보르도',
+        'Lille': '릴', 'Rennes': '렌', 'Reims': '랭스',
+        'Le Havre': '르아브르', 'Saint-Étienne': '생테티엔', 'Toulon': '툴롱',
+        'Grenoble': '그르노블', 'Dijon': '디종', 'Angers': '앙제',
+        'Nîmes': '님', 'Aix-en-Provence': '엑상프로방스', 'Cannes': '칸',
+        'Brest': '브레스트', 'Tours': '투르', 'Amiens': '아미앵',
+
+        # 독일 주요 도시
+        'Berlin': '베를린', 'Hamburg': '함부르크', 'Munich': '뮌헨',
+        'Cologne': '쾰른', 'Frankfurt': '프랑크푸르트', 'Stuttgart': '슈투트가르트',
+        'Düsseldorf': '뒤셀도르프', 'Dortmund': '도르트문트', 'Essen': '에센',
+        'Leipzig': '라이프치히', 'Bremen': '브레멘', 'Dresden': '드레스덴',
+        'Hanover': '하노버', 'Nuremberg': '뉘른베르크', 'Duisburg': '뒤스부르크',
+        'Bochum': '보훔', 'Wuppertal': '부퍼탈', 'Bonn': '본',
+        'Bielefeld': '빌레펠트', 'Mannheim': '만하임', 'Karlsruhe': '카를스루에',
+        'Münster': '뮌스터', 'Augsburg': '아우크스부르크',
+
+        # 스페인 주요 도시
+        'Madrid': '마드리드', 'Barcelona': '바르셀로나', 'Valencia': '발렌시아',
+        'Seville': '세비야', 'Zaragoza': '사라고사', 'Málaga': '말라가',
+        'Murcia': '무르시아', 'Palma': '팔마', 'Las Palmas': '라스팔마스',
+        'Bilbao': '빌바오', 'Alicante': '알리칸테', 'Córdoba': '코르도바',
+        'Valladolid': '바야돌리드', 'Vigo': '비고', 'Gijón': '히혼',
+        'Granada': '그라나다', 'San Sebastián': '산세바스티안',
+
+        # 이탈리아 주요 도시
+        'Rome': '로마', 'Milan': '밀라노', 'Naples': '나폴리',
+        'Turin': '토리노', 'Palermo': '팔레르모', 'Genoa': '제노바',
+        'Bologna': '볼로냐', 'Florence': '피렌체', 'Bari': '바리',
+        'Catania': '카타니아', 'Venice': '베네치아', 'Verona': '베로나',
+        'Messina': '메시나', 'Padua': '파도바', 'Trieste': '트리에스테',
+        'Brescia': '브레시아', 'Parma': '파르마', 'Pisa': '피사',
+        'Modena': '모데나', 'Rimini': '리미니', 'Ravenna': '라벤나',
+
+        # 네덜란드 주요 도시
+        'Amsterdam': '암스테르담', 'Rotterdam': '로테르담', 'The Hague': '헤이그',
+        'Utrecht': '위트레흐트', 'Eindhoven': '에인트호번', 'Tilburg': '틸뷔르흐',
+        'Groningen': '흐로닝언', 'Almere': '알메르', 'Breda': '브레다',
+        'Nijmegen': '네이메헌', 'Maastricht': '마스트리흐트',
+
+        # 벨기에 주요 도시
+        'Brussels': '브뤼셀', 'Antwerp': '앤트워프', 'Ghent': '겐트',
+        'Charleroi': '샤를루아', 'Liège': '리에주', 'Bruges': '브뤼헤',
+        'Namur': '나뮈르', 'Leuven': '뢰번',
+
+        # 스위스 주요 도시
+        'Zurich': '취리히', 'Geneva': '제네바', 'Basel': '바젤',
+        'Bern': '베른', 'Lausanne': '로잔', 'Lucerne': '루체른',
+        'Interlaken': '인터라켄', 'St. Moritz': '생모리츠',
+
+        # 오스트리아 주요 도시
+        'Vienna': '빈', 'Graz': '그라츠', 'Linz': '린츠',
+        'Salzburg': '잘츠부르크', 'Innsbruck': '인스브루크',
+
+        # 북유럽 주요 도시
+        'Stockholm': '스톡홀름', 'Gothenburg': '예테보리', 'Malmö': '말뫼',
+        'Copenhagen': '코펜하겐', 'Oslo': '오슬로', 'Bergen': '베르겐',
+        'Helsinki': '헬싱키', 'Tampere': '탐페레', 'Turku': '투르쿠',
+        'Tallinn': '탈린', 'Reykjavik': '레이캬비크',
+
+        # 동유럽 주요 도시
+        'Warsaw': '바르샤바', 'Kraków': '크라쿠프', 'Prague': '프라하',
+        'Budapest': '부다페스트', 'Bucharest': '부쿠레슈티', 'Sofia': '소피아',
+        'Belgrade': '베오그라드', 'Zagreb': '자그레브', 'Bratislava': '브라티슬라바',
+        'Ljubljana': '류블랴나', 'Vilnius': '빌뉴스', 'Riga': '리가',
+        'Kiev': '키예프', 'Moscow': '모스크바', 'St. Petersburg': '상트페테르부르크',
+
+        # 그리스/터키 주요 도시
+        'Athens': '아테네', 'Thessaloniki': '테살로니키', 'Istanbul': '이스탄불',
+        'İstanbul': '이스탄불', 'Ankara': '앙카라', 'Izmir': '이즈미르',
+
+        # 아시아 주요 도시
+        'Tokyo': '도쿄', 'Osaka': '오사카', 'Kyoto': '교토',
+        'Yokohama': '요코하마', 'Nagoya': '나고야', 'Sapporo': '삿포로',
+        'Fukuoka': '후쿠오카', 'Kobe': '고베', 'Hiroshima': '히로시마',
+        'Sendai': '센다이', 'Nara': '나라', 'Okinawa': '오키나와',
+        'Seoul': '서울', 'Busan': '부산', 'Incheon': '인천',
+        'Daegu': '대구', 'Daejeon': '대전', 'Gwangju': '광주',
+        'Beijing': '베이징', 'Shanghai': '상하이', 'Guangzhou': '광저우',
+        'Shenzhen': '선전', 'Chengdu': '청두', 'Hong Kong': '홍콩',
+        'Taipei': '타이베이', 'Singapore': '싱가포르', 'Bangkok': '방콕',
+        'Kuala Lumpur': '쿠알라룸푸르', 'Manila': '마닐라', 'Jakarta': '자카르타',
+        'Hanoi': '하노이', 'Ho Chi Minh': '호치민', 'Phnom Penh': '프놈펜',
+        'New Delhi': '뉴델리', 'Mumbai': '뭄바이', 'Bangalore': '방갈로르',
+        'Kolkata': '콜카타', 'Chennai': '첸나이', 'Hyderabad': '하이데라바드',
+        'Kathmandu': '카트만두', 'Pokhara': '포카라', 'Colombo': '콜롬보',
+        'Dhaka': '다카', 'Karachi': '카라치', 'Islamabad': '이슬라마바드',
+
+        # 중동 주요 도시
+        'Dubai': '두바이', 'Abu Dhabi': '아부다비', 'Doha': '도하',
+        'Riyadh': '리야드', 'Jeddah': '제다', 'Amman': '암만',
+        'Beirut': '베이루트', 'Jerusalem': '예루살렘', 'Tel Aviv': '텔아비브',
+
+        # 오세아니아 주요 도시
+        'Sydney': '시드니', 'Melbourne': '멜버른', 'Brisbane': '브리즈번',
+        'Perth': '퍼스', 'Adelaide': '애들레이드', 'Canberra': '캔버라',
+        'Gold Coast': '골드코스트', 'Auckland': '오클랜드', 'Wellington': '웰링턴',
+        'Christchurch': '크라이스트처치', 'Queenstown': '퀸스타운',
+
+        # 남미 주요 도시
+        'Buenos Aires': '부에노스아이레스', 'São Paulo': '상파울루', 'Rio de Janeiro': '리우데자네이루',
+        'Brasília': '브라질리아', 'Lima': '리마', 'Bogotá': '보고타',
+        'Santiago': '산티아고', 'Caracas': '카라카스', 'Quito': '키토',
+        'Montevideo': '몬테비데오', 'Asunción': '아순시온', 'La Paz': '라파스',
+
+        # 아프리카 주요 도시
+        'Cairo': '카이로', 'Cape Town': '케이프타운', 'Johannesburg': '요하네스버그',
+        'Nairobi': '나이로비', 'Lagos': '라고스', 'Kinshasa': '킨샤사',
+        'Casablanca': '카사블랑카', 'Marrakech': '마라케시', 'Tunis': '튀니스',
+        'Addis Ababa': '아디스아바바', 'Dar es Salaam': '다르에스살람',
+
+        # 멕시코 주요 도시
+        'Mexico City': '멕시코시티', 'Guadalajara': '과달라하라', 'Monterrey': '몬테레이',
+        'Cancún': '칸쿤', 'Tijuana': '티후아나', 'Puebla': '푸에블라',
+    }
+
     # 국가 → 대륙(한글) 매핑
     COUNTRY_CONTINENT_KR = {
         # 아시아
@@ -309,6 +473,67 @@ class MarathonParser:
     def get_continent_kr(country: str) -> str:
         """국가명으로 한글 대륙명 반환"""
         return MarathonParser.COUNTRY_CONTINENT_KR.get(country, '')
+
+    @staticmethod
+    def translate_with_api(text: str) -> str:
+        """
+        MyMemory Translation API를 사용한 영어 → 한국어 번역
+        무료, 빠르고 안정적
+        """
+        try:
+            url = "https://api.mymemory.translated.net/get"
+            params = {
+                'q': text,
+                'langpair': 'en|ko'
+            }
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+            }
+
+            response = requests.get(url, params=params, headers=headers, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                translated = data.get('responseData', {}).get('translatedText', text)
+
+                # 번역 결과가 원본과 같거나 비어있으면 원본 유지
+                if translated and translated != text:
+                    return translated
+
+            return text
+
+        except Exception as e:
+            # API 오류시 원본 유지
+            return text
+
+    @staticmethod
+    def get_city_kr(city: str) -> str:
+        """
+        도시명을 한글로 변환
+        1. CITY_KR 딕셔너리에서 매핑 확인
+        2. 매핑 없으면 MyMemory Translation API로 번역
+        3. API 실패시 원본 유지
+        """
+        if not city or not city.strip():
+            return city
+
+        # 1. 딕셔너리에서 매핑 확인
+        if city in MarathonParser.CITY_KR:
+            return MarathonParser.CITY_KR[city]
+
+        # 2. 캐시에서 확인
+        if city in MarathonParser._translation_cache:
+            return MarathonParser._translation_cache[city]
+
+        # 3. MyMemory Translation API로 번역
+        translated = MarathonParser.translate_with_api(city)
+
+        # 캐시에 저장
+        MarathonParser._translation_cache[city] = translated
+
+        # API 호출 간격 (너무 빠르게 호출하면 차단될 수 있음)
+        time.sleep(0.1)
+
+        return translated
 
     # 태그 한글 변환 (자연스러운 것만)
     TAG_KR = {
@@ -612,10 +837,10 @@ class MarathonParser:
             'lastRaceDate': last_race_date,
             
             # 위치 정보
-            'city': city,
+            'city': MarathonParser.get_city_kr(city),
             'country': MarathonParser.get_country_kr(country),
             'countryCode': country_code,
-            'location': f"{city}, {MarathonParser.get_country_kr(country)}" if city and country else city or MarathonParser.get_country_kr(country),
+            'location': f"{MarathonParser.get_city_kr(city)}, {MarathonParser.get_country_kr(country)}" if city and country else MarathonParser.get_city_kr(city) or MarathonParser.get_country_kr(country),
             'continent': MarathonParser.get_continent_kr(country),
             'startPoint': start_point,
             'coordinates': {
